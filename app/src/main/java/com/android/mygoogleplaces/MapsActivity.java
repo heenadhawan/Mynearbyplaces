@@ -4,6 +4,8 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 
 import android.os.Build;
@@ -13,6 +15,10 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
+import android.text.TextUtils;
+import android.util.Log;
+import android.view.View;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.android.gms.location.LocationListener;
@@ -30,6 +36,9 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import java.io.IOException;
+import java.util.List;
+
 public
 class MapsActivity extends FragmentActivity
         implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks,
@@ -41,6 +50,9 @@ class MapsActivity extends FragmentActivity
     private Location lastlocation;
     private Marker currentlocationusermarker;
     private static final int Request_user_location_code = 99;
+    private double latitude,longitude;
+    private int ProximityRadius = 1000;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -110,23 +122,34 @@ mMap.setMyLocationEnabled(true);
 
     @Override
     public void onLocationChanged(Location location) {
-lastlocation = location;
-if(currentlocationusermarker!= null){
-    currentlocationusermarker.remove();
-}
-LatLng latlng = new LatLng(location.getLatitude(),location.getLongitude());
-MarkerOptions markerOptions = new MarkerOptions();
-markerOptions.position(latlng);
-markerOptions.title("My current locartion");
-markerOptions.icon(BitmapDescriptorFactory.defaultMarker
-        (BitmapDescriptorFactory.HUE_GREEN));
-currentlocationusermarker = mMap.addMarker(markerOptions);
-mMap.moveCamera(CameraUpdateFactory.newLatLng(latlng));
-mMap.animateCamera(CameraUpdateFactory.zoomBy(12));
-if(googleapiclient !=null){
-    LocationServices.FusedLocationApi.removeLocationUpdates(googleapiclient,this);
-}
+        latitude = location.getLatitude();
+        longitude = location.getLongitude();
+
+        lastlocation = location;
+
+        if (currentlocationusermarker != null)
+        {
+            currentlocationusermarker.remove();
+        }
+
+        LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+
+        MarkerOptions markerOptions = new MarkerOptions();
+        markerOptions.position(latLng);
+        markerOptions.title("user Current Location");
+        markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+
+        currentlocationusermarker = mMap.addMarker(markerOptions);
+
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+        mMap.animateCamera(CameraUpdateFactory.zoomBy(12));
+
+        if (googleapiclient != null)
+        {
+            LocationServices.FusedLocationApi.removeLocationUpdates(googleapiclient, this);
+        }
     }
+
 
 
     @Override
@@ -149,6 +172,95 @@ if(googleapiclient !=null){
 
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+    }
 
+    public void onClick(View view) {
+
+        String hospital = "hospitals",school = "school",Resturants = "resturants";
+      Object transferdata[] = new Object[2];
+      GetNearbyPlaces getNearbyPlaces  = new GetNearbyPlaces();
+
+        switch (view.getId()){
+            case R.id.search__address:
+                EditText addressfield =(EditText)findViewById(R.id.location_search);
+                String address= addressfield.getText().toString();
+                List<Address> addressList = null;
+                MarkerOptions usermarkeroption = new MarkerOptions();
+
+        if(!TextUtils.isEmpty(address)){
+
+        Geocoder geocoder =new Geocoder(this);
+        try {
+
+        addressList = geocoder.getFromLocationName(address,6);
+
+        if(addressList!=null) {
+            for (int i = 0; i < addressList.size(); i++) {
+                Address userAddress = addressList.get(i);
+                LatLng latLng = new LatLng(userAddress.getLatitude(), userAddress.getLongitude());
+                usermarkeroption.position(latLng);
+                usermarkeroption.title(address);
+                usermarkeroption.icon(BitmapDescriptorFactory.defaultMarker
+                        (BitmapDescriptorFactory.HUE_BLUE));
+                mMap.addMarker(usermarkeroption);
+                mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+                mMap.animateCamera(CameraUpdateFactory.zoomBy(10));
+            }
+        }
+        else
+        {
+            Toast.makeText(this,"Location not found",Toast.LENGTH_SHORT).show();
+        }
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+
+                }
+
+        else {
+            Toast.makeText(this,"please enter the address",Toast.LENGTH_SHORT).show();
+        }
+            break;
+            case R.id.hospital:
+                mMap.clear();
+                String url = geturl(latitude,longitude,hospital);
+                transferdata[0] =mMap;
+                transferdata[1]=url;
+                getNearbyPlaces.execute(transferdata);
+                Toast.makeText(this,"Searching nearby hospitals",Toast.LENGTH_SHORT).show();
+                Toast.makeText(this,"Showing nearby hospitals",Toast.LENGTH_SHORT).show();
+                break;
+
+        case R.id.school:
+        mMap.clear();
+         url = geturl(latitude,longitude,school);
+        transferdata[0] =mMap;
+        transferdata[1]=url;
+        getNearbyPlaces.execute(transferdata);
+        Toast.makeText(this,"Searching nearby school",Toast.LENGTH_SHORT).show();
+        Toast.makeText(this,"Showing nearby school",Toast.LENGTH_SHORT).show();
+        break;
+
+      case R.id.resturant:
+            mMap.clear();
+            url = geturl(latitude,longitude,Resturants);
+                transferdata[0] =mMap;
+                transferdata[1]=url;
+                getNearbyPlaces.execute(transferdata);
+                Toast.makeText(this,"Searching nearby resturants",Toast.LENGTH_SHORT).show();
+                Toast.makeText(this,"Showing nearby resturants",Toast.LENGTH_SHORT).show();
+                break;
+           }
+    }
+
+    private String  geturl (double latitude,double longitude,String nearbyplace){
+        StringBuilder googleUrl = new StringBuilder("https://maps.googleapis.com/maps/api/place/nearbysearch/json?");
+        googleUrl.append("location="+ latitude+ ","+longitude);
+        googleUrl.append("&radius="+ProximityRadius);
+        googleUrl.append("$type"   +nearbyplace);
+        googleUrl.append("sensor=true");
+        googleUrl.append("&key"+"PlaceAPI key");
+        Log.d("GoogleMApsActivity","url = "+ googleUrl.toString());
+        return googleUrl.toString();
     }
 }
